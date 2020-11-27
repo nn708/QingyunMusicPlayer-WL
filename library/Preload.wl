@@ -4,8 +4,8 @@ Begin["Thulium`System`"];
 
 Begin["`Private`"];
 
-$$Version = "2.4";
-$$Build = 701;
+$$Version = "2.5";
+$$Build = 756;
 If[DirectoryQ[$LocalPath <> ".git"], 
   With[{ref = StringCases[Import[$LocalPath <> ".git/HEAD"], RegularExpression["^ref: (.+)$"] :> "$1"][[1]]},
     $$Commit = StringTake[Import[$LocalPath <> ".git/" <> ref], 7];
@@ -15,10 +15,10 @@ If[DirectoryQ[$LocalPath <> ".git"],
   $$Branch = "";
 ];
 
-Switch[$VersionNumber,
-  11.2, StatusAlias = "State",
-  11.3, StatusAlias = "Status",
-  _,
+Which[
+  $VersionNumber == 11.2, StatusAlias = "State",
+  $VersionNumber >= 11.3, StatusAlias = "Status",
+  True,
   CreateDialog[{
     TextCell["Sorry, but your Mathematica isn't updated enough."],
     TextCell["Try to install Mathematica with version no less than 11.2."],
@@ -35,6 +35,8 @@ userInfoTemplate=<|
   "NodeJS" -> False,
   "Language" -> "chs",
   "Developer" -> False,
+  "ListLength" -> 10,
+  "Looping" -> False,
   "DataPath" -> defaultDataPath
 |>;
 
@@ -116,7 +118,7 @@ If[!FileExistsQ[$DataPath <> "Index.mx"],
   SongIndex = <||>;
   PlaylistIndex = <||>;
   ImageIndex = <||>;
-  Thulium`PageIndex = <|"Main" -> 1|>;
+  PageIndex = <|"Main" -> 1|>;
   DumpSave[$DataPath <> "Index.mx", {
     SongIndex, PlaylistIndex, ImageIndex
   }],
@@ -124,7 +126,7 @@ If[!FileExistsQ[$DataPath <> "Index.mx"],
   If[Head[SongIndex] =!= Association, SongIndex = <||>];
   If[Head[ImageIndex] =!= Association, ImageIndex = <||>];
   If[Head[PlaylistIndex] =!= Association, PlaylistIndex = <||>];
-  Thulium`PageIndex = Prepend[
+  PageIndex = Prepend[
     AssociationMap[1&, Keys @ PlaylistIndex],
     {"Main" -> 1}
   ];

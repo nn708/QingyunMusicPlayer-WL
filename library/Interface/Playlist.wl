@@ -1,27 +1,31 @@
 (* ::Package:: *)
 
-BeginPackage["Thulium`Interface`Homepage`", {
+BeginPackage["Thulium`Interface`Playlist`", {
   "Thulium`System`",
   "Thulium`Assets`",
   "Thulium`StyleSheet`",
   "Thulium`PageSel`"
 }];
 
-Homepage::usage = "Thulium Music Home Page";
+Playlist::usage = "Thulium Music Playlist Page";
 
 Begin["`Private`"];
 
-Homepage[] := Block[
+Playlist[playlist_] := Block[
   {
-    length, playlists, pageCount, display
+    info, length, songList, indexList, indexWidth, pageCount, display
   },
   
-  length = Length @ Keys @ PlaylistIndex;
+  Thulium`CurrentPlaylist = playlist;
+  info = PlaylistIndex[playlist];
+  length = Length @ info["SongList"];
   pageCount = Ceiling[length / 10];
-  playlists = Partition[Keys @ PlaylistIndex, UpTo @ Ceiling[length / pageCount]];
-  If[PageIndex["Main"] > pageCount, PageIndex["Main"] = pageCount];
+  songList = Partition["Song" /. info["SongList"], UpTo @ Ceiling[length / pageCount]];
+  indexList = Partition["Index" /. info["SongList"], UpTo @ Ceiling[length / pageCount]];
+  indexWidth = 8 * Max[0, TextLength /@ DeleteCases[indexList, "Index", Infinity]];
+  If[PageIndex[playlist] > pageCount, PageIndex[playlist] = pageCount];
   
-  Module[{page = PageIndex["Main"], index = 1},
+  Module[{page = PageIndex[playlist], index = 1},
     With[
       {
         ChsFont = ChsFont, TextDict = TextDict,
@@ -29,29 +33,36 @@ Homepage[] := Block[
       },
       
       display = Table[Table[
-        With[{info = PlaylistIndex[playlists[[pg, id]]]},
+        With[
+          {
+            songInfo = SongIndex[info["Path"] <> songList[[pg, id]]],
+            indexName = If[indexList[[pg, id]] =!= "Index", indexList[[pg, id]], ""]
+          },
           {TemplateBox[{
             RowBox[{
-              PaneBox[
-                AdjustmentBox[
-                  StyleBox[TagName[info["Type"]],
-                    FontSize -> 12,
-                    FontFamily -> ChsFont,
-                    FontColor -> GrayLevel[0.3]
+              If[indexName =!= "",
+                PaneBox[
+                  AdjustmentBox[
+                    StyleBox[indexList[[pg, id]],
+                      FontSize -> 12,
+                      FontFamily -> ChsFont,
+                      FontColor -> GrayLevel[0.3]
+                    ],
+                    BoxMargins -> {{0, 0.6}, {0, 0}},
+                    BoxBaselineShift -> -0.4
                   ],
-                  BoxMargins -> {{0, 0.6}, {0, 0}},
-                  BoxBaselineShift -> -0.4
+                  ImageSize -> indexWidth,
+                  Alignment -> Center
                 ],
-                ImageSize -> 32,
-                Alignment -> Center
+                Nothing
               ],
-              StyleBox[info["Title"],
+              StyleBox[songInfo["SongName"],
                 FontSize -> 14,
                 FontFamily -> ChsFont
               ],
               TemplateBox[{8}, "Spacer1"],
-              If[Total @ TextLength[{TagName[info["Type"]], info["Title"], info["Comment"]}] <= 64,
-                StyleBox[info["Comment"],
+              If[Total @ TextLength[{indexName, songInfo["SongName"], songInfo["Comment"]}] <= 64,
+                StyleBox[songInfo["Comment"],
                   FontSize -> 12,
                   FontFamily -> ChsFont,
                   FontColor -> GrayLevel[0.3]
@@ -62,8 +73,11 @@ Homepage[] := Block[
             StyleBox[
               GridBox[
                 {
-                  {TagName["Type"] <> ":", TagName[info["Type"]]},
-                  {TagName["Title"] <> ":", info["Title"]}
+                  {TagName["FileName"] <> ":", songList[[pg, id]]},
+                  {TagName["SongName"] <> ":", songInfo["SongName"]},
+                  If[songInfo["Uploader"] =!= "",
+                    {TagName["Uploader"] <> ":", songInfo["Uploader"]},
+                  Nothing]
                 },
                 ColumnSpacings -> 1,
                 ColumnAlignments -> {Center, Left}
@@ -71,39 +85,36 @@ Homepage[] := Block[
               FontSize -> 20,
               FontFamily -> ChsFont
             ],
-            With[{playlist = playlists[[pg, id]]},
-              Hold @ DialogReturn[PageIndex["Main"] = GetValue[page]; Thulium`Playlist[playlist]]
+            With[{song = info["Path"] <> songList[[pg, id]]},
+              Hold @ DialogReturn[
+                PageIndex[playlist] = GetValue[page];
+                Thulium`Player[song];
+              ]
             ]
           }, "<List-Local>"]}
         ],
-      {id, Length @ playlists[[pg]]}], {pg, pageCount}];
+      {id, Length @ songList[[pg]]}], {pg, pageCount}];
   
       CreateDialog[
         {
           Cell[BoxData @ RowBox[{
-            StyleBox[TextDict["Thulium"], "Title"],
-            TemplateBox[{200}, "Spacer1"],
+            StyleBox[info["Title"], "Title"],
+            TemplateBox[{280}, "Spacer1"],
             AdjustmentBox[
-              TemplateBox[{"Settings", Hold @ DialogReturn[PageIndex["Main"] = GetValue[page]; Thulium`Settings[]]}, "<Button-Local>"],
-              BoxBaselineShift -> -0.2
-            ],
-            TemplateBox[{2}, "Spacer1"],
-            AdjustmentBox[
-              TemplateBox[{"About", Hold @ DialogReturn[PageIndex["Main"] = GetValue[page]; Thulium`About[]]}, "<Button-Local>"],
-              BoxBaselineShift -> -0.2
-            ],
-            TemplateBox[{2}, "Spacer1"],
-            AdjustmentBox[
-              TemplateBox[{"Exit", Hold @ DialogReturn[PageIndex["Main"] = GetValue[page]]}, "<Button-Local>"],
+              TemplateBox[{"Return", Hold @ DialogReturn[PageIndex[playlist] = GetValue[page]; Thulium`Homepage[]]}, "<Button-Local>"],
               BoxBaselineShift -> -0.2
             ]
           }], "Title"],
+          
+          If[info["Comment"] =!= "", Cell[BoxData @ PaneBox[
+            StyleBox[info["Comment"], "Subtitle"]
+          ], "Subtitle"], Nothing],
           
           Cell[BoxData @ PaneBox[PaneSelectorBox[
             Array[Function[{pg},
               pg -> GridBox[Array[
                 Function[{id}, display[[pg, id]]],
-              Length @ playlists[[pg]]]]
+              Length @ songList[[pg]]]]
             ], pageCount],
           Dynamic[page]]], "SetterList"],
           
@@ -121,6 +132,14 @@ Homepage[] := Block[
             FontFamily -> ChsFont,
             FontSize -> 24,
             FontWeight -> Bold
+          ],
+          
+          Cell[StyleData["Subtitle"],
+            CellMargins -> {{0, 0}, {0, 0}},
+            TextAlignment -> Center,
+            FontFamily -> ChsFont,
+            FontSize -> 14,
+            PaneBoxOptions -> {Alignment -> Left, ImageSize -> 440}
           ],
           
           Cell[StyleData["SetterList"],
@@ -174,7 +193,7 @@ Homepage[] := Block[
                       Alignment -> Left
                     ],
                     AdjustmentBox[
-                      TemplateBox[{"Enter", #5, #4}, "<List-Button>"],
+                      TemplateBox[{"Play", #5, #4}, "<List-Button>"],
                       BoxBaselineShift -> -0.1
                     ]
                   }
@@ -200,7 +219,7 @@ Homepage[] := Block[
         ShowCellBracket -> False,
         CellGrouping -> Manual,
         Background -> RGBColor[1, 1, 1],
-        WindowTitle -> TextDict["Thulium"],
+        WindowTitle -> TagName[info["Type"]] <> " - " <> info["Title"],
         WindowElements -> {},
         WindowFrameElements -> {"CloseBox", "MinimizeBox"},
         WindowSize -> {1200, 900},
@@ -220,7 +239,7 @@ Homepage[] := Block[
 
 End[];
 
-Thulium`Homepage = Thulium`Interface`Homepage`Homepage;
+Thulium`Playlist = Thulium`Interface`Playlist`Playlist;
 
 EndPackage[];
 
@@ -230,4 +249,24 @@ EndPackage[];
 
 
 (* ::Input:: *)
-(*Thulium`Interface`Homepage`Homepage[];*)
+(*Playlist["All"];*)
+
+
+(* ::Input:: *)
+(*Playlist["TH11-Chireiden.qyl"];*)
+
+
+(* ::Input:: *)
+(*Playlist["Clannad.qyl"];*)
+
+
+(* ::Input:: *)
+(*SongIndex["Touhou/TH11-Chireiden/3rd_Eye"]*)
+
+
+(* ::Input:: *)
+(*PlaylistIndex["Clannad.qyl"]*)
+
+
+(* ::Input:: *)
+(*PageIndex*)
